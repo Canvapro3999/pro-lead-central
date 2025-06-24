@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Home, 
@@ -14,7 +14,11 @@ import {
   LogOut
 } from 'lucide-react';
 
-const Layout = () => {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -107,7 +111,7 @@ const Layout = () => {
 
         {/* Page content */}
         <main className="p-6">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>
