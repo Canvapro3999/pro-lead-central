@@ -52,21 +52,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
-        const userData = { id: data.id, email: data.email, token: data.token };
         
-        setUser(userData);
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userEmail', data.email);
-        localStorage.setItem('userId', data.id.toString());
-        
-        toast.success('Login successful!');
-        return true;
+        // Handle the response structure from your backend
+        if (data.success) {
+          const userData = { 
+            id: data.user.id, 
+            email: data.user.email, 
+            token: data.token 
+          };
+          
+          setUser(userData);
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('userEmail', data.user.email);
+          localStorage.setItem('userId', data.user.id.toString());
+          
+          toast.success('Login successful!');
+          return true;
+        } else {
+          toast.error(data.message || 'Login failed');
+          return false;
+        }
       } else {
         const error = await response.json();
         toast.error(error.message || 'Login failed');
         return false;
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast.error('Network error. Please try again.');
       return false;
     } finally {
@@ -85,14 +97,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok) {
         const data = await response.json();
-        toast.success('Registration successful! Please login.');
-        return true;
+        if (data.success) {
+          toast.success('Registration successful! Please login.');
+          return true;
+        } else {
+          toast.error(data.message || 'Registration failed');
+          return false;
+        }
       } else {
         const error = await response.json();
         toast.error(error.message || 'Registration failed');
         return false;
       }
     } catch (error) {
+      console.error('Registration error:', error);
       toast.error('Network error. Please try again.');
       return false;
     } finally {
