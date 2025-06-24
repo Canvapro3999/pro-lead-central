@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
@@ -37,6 +36,7 @@ const Dashboard = () => {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,15 +45,42 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [purchases, customLeads, refunds] = await Promise.all([
+      setError(null);
+      console.log('Fetching dashboard data...');
+      
+      const [purchasesResponse, customLeadsResponse, refundsResponse] = await Promise.all([
         api.getPurchaseHistory(),
         api.getCustomLeads(),
         api.getRefunds()
       ]);
 
-      // Calculate stats
-      const totalLeadsPurchased = purchases.reduce((sum: number, purchase: any) => sum + purchase.quantity, 0);
-      const totalSpent = purchases.reduce((sum: number, purchase: any) => sum + purchase.amount, 0);
+      console.log('API Responses:', {
+        purchases: purchasesResponse,
+        customLeads: customLeadsResponse,
+        refunds: refundsResponse
+      });
+
+      // Ensure we have arrays, fallback to empty arrays if not
+      const purchases = Array.isArray(purchasesResponse) ? purchasesResponse : 
+                       (purchasesResponse?.data && Array.isArray(purchasesResponse.data)) ? purchasesResponse.data : [];
+      
+      const customLeads = Array.isArray(customLeadsResponse) ? customLeadsResponse : 
+                         (customLeadsResponse?.data && Array.isArray(customLeadsResponse.data)) ? customLeadsResponse.data : [];
+      
+      const refunds = Array.isArray(refundsResponse) ? refundsResponse : 
+                     (refundsResponse?.data && Array.isArray(refundsResponse.data)) ? refundsResponse.data : [];
+
+      console.log('Processed arrays:', { purchases, customLeads, refunds });
+
+      // Calculate stats with safe array operations
+      const totalLeadsPurchased = purchases.reduce((sum: number, purchase: any) => {
+        return sum + (purchase.quantity || 0);
+      }, 0);
+      
+      const totalSpent = purchases.reduce((sum: number, purchase: any) => {
+        return sum + (purchase.amount || 0);
+      }, 0);
+      
       const activeRequests = customLeads.filter((lead: any) => lead.status === 'pending').length;
       const completedPurchases = purchases.length;
 
@@ -64,36 +91,54 @@ const Dashboard = () => {
         completedPurchases
       });
 
-      // Combine and format recent activity
-      const activities: RecentActivity[] = [
-        ...purchases.slice(0, 3).map((purchase: any) => ({
-          id: purchase.id,
+      // Combine and format recent activity with safe array operations
+      const activities: RecentActivity[] = [];
+      
+      // Add purchase activities
+      purchases.slice(0, 3).forEach((purchase: any) => {
+        activities.push({
+          id: purchase.id || Math.random(),
           type: 'purchase' as const,
-          description: `Purchased ${purchase.quantity} leads from ${purchase.leadBundle?.title || 'Lead Bundle'}`,
-          date: purchase.createdAt,
-          amount: purchase.amount,
-          status: purchase.status
-        })),
-        ...customLeads.slice(0, 2).map((lead: any) => ({
-          id: lead.id,
-          type: 'custom_lead' as const,
-          description: `Custom lead request for ${lead.industry} industry`,
-          date: lead.createdAt,
-          status: lead.status
-        })),
-        ...refunds.slice(0, 2).map((refund: any) => ({
-          id: refund.id,
-          type: 'refund' as const,
-          description: `Refund request for purchase #${refund.purchaseId}`,
-          date: refund.createdAt,
-          amount: refund.amount,
-          status: refund.status
-        }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+          description: `Purchased ${purchase.quantity || 0} leads from ${purchase.leadBundle?.title || 'Lead Bundle'}`,
+          date: purchase.createdAt || new Date().toISOString(),
+          amount: purchase.amount || 0,
+          status: purchase.status || 'completed'
+        });
+      });
 
-      setRecentActivity(activities);
+      // Add custom lead activities
+      customLeads.slice(0, 2).forEach((lead: any) => {
+        activities.push({
+          id: lead.id || Math.random(),
+          type: 'custom_lead' as const,
+          description: `Custom lead request for ${lead.industry || 'Unknown'} industry`,
+          date: lead.createdAt || new Date().toISOString(),
+          status: lead.status || 'pending'
+        });
+      });
+
+      // Add refund activities
+      refunds.slice(0, 2).forEach((refund: any) => {
+        activities.push({
+          id: refund.id || Math.random(),
+          type: 'refund' as const,
+          description: `Refund request for purchase #${refund.purchaseId || 'N/A'}`,
+          date: refund.createdAt || new Date().toISOString(),
+          amount: refund.amount || 0,
+          status: refund.status || 'pending'
+        });
+      });
+
+      // Sort by date and limit to 5
+      const sortedActivities = activities.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      ).slice(0, 5);
+
+      setRecentActivity(sortedActivities);
+      
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -136,6 +181,23 @@ const Dashboard = () => {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-64 space-y-4">
+        <div className="text-red-600 text-center">
+          <h3 className="text-lg font-medium">Error Loading Dashboard</h3>
+          <p className="text-sm mt-1">{error}</p>
+        </div>
+        <button
+          onClick={fetchDashboardData}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
